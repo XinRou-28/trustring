@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import GuardianChat from "./guardian-chat";
 import TelemetryDrawer, { type TelemetryEntry } from "./telemetry-drawer";
 import VictimCallUi from "./victim-call-ui";
 
@@ -27,7 +28,7 @@ export default function Dashboard() {
         <section className="flex min-h-0 flex-[2] flex-col bg-zinc-900 p-6">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-400">Monitoring / Active</p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">Guardian Screen</h2>
-          <div className="mt-6 flex flex-1 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/60 font-mono text-sm text-zinc-500">Guardian controls</div>
+          <GuardianChat />
         </section>
       </main>
       <TelemetryDrawer entries={telemetry} />
