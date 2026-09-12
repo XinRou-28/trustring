@@ -27,7 +27,13 @@ declare global {
   }
 }
 
-type VictimCallUiProps = { onTranscriptChunk: (text: string) => void };
+export type VictimProtectionState = "safe" | "trap" | null;
+
+type VictimCallUiProps = {
+  onTranscriptChunk: (text: string) => void;
+  protectionState?: VictimProtectionState;
+  trapQuestion?: string;
+};
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -35,7 +41,11 @@ function formatDuration(seconds: number) {
   return `${minutes}:${remainder}`;
 }
 
-export default function VictimCallUi({ onTranscriptChunk }: VictimCallUiProps) {
+export default function VictimCallUi({
+  onTranscriptChunk,
+  protectionState = null,
+  trapQuestion = "",
+}: VictimCallUiProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
@@ -46,9 +56,11 @@ export default function VictimCallUi({ onTranscriptChunk }: VictimCallUiProps) {
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (protectionState === "safe") return;
+
     const timer = window.setInterval(() => setElapsedSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [protectionState]);
 
   useEffect(() => {
     const scrollToLatestTranscript = async () => {
@@ -72,6 +84,13 @@ export default function VictimCallUi({ onTranscriptChunk }: VictimCallUiProps) {
       recognitionRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (protectionState !== "safe") return;
+
+    shouldListenRef.current = false;
+    recognitionRef.current?.stop();
+  }, [protectionState]);
 
   const startListening = () => {
     const SpeechRecognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
@@ -133,16 +152,16 @@ export default function VictimCallUi({ onTranscriptChunk }: VictimCallUiProps) {
   };
 
   return (
-    <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/30">
+    <div className="relative mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/30">
       <div className="flex flex-col items-center border-b border-zinc-800 px-6 py-8 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-400/10 text-xl font-semibold text-cyan-200 ring-1 ring-cyan-400/30">M</div>
         <p className="mt-4 text-xl font-semibold text-zinc-50">Mom</p>
         <p className="mt-1 font-mono text-sm text-emerald-300">{formatDuration(elapsedSeconds)}</p>
         <div className="mt-6 flex h-8 items-center gap-1" aria-label="Listening waveform">
-          {[12, 22, 30, 18, 26, 14, 24].map((height, index) => <span key={height} className={`w-1 rounded-full bg-cyan-300 ${isListening ? "animate-pulse" : "opacity-40"}`} style={{ height, animationDelay: `${index * 120}ms` }} />)}
+          {[12, 22, 30, 18, 26, 14, 24].map((height, index) => <span key={height} className={`w-1 rounded-full bg-cyan-300 ${isListening && protectionState !== "safe" ? "animate-pulse" : "opacity-40"}`} style={{ height, animationDelay: `${index * 120}ms` }} />)}
         </div>
         <button type="button" onClick={isListening ? stopListening : startListening} className="mt-5 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-4 py-2 font-mono text-xs font-medium uppercase tracking-wider text-cyan-200 transition-colors hover:bg-cyan-400/20 focus-visible:outline-2 focus-visible:outline-cyan-300">
-          {isListening ? "Stop listening" : "Start listening"}
+          {isListening && protectionState !== "safe" ? "Stop listening" : "Start listening"}
         </button>
         <p className="mt-3 font-mono text-xs text-zinc-500" aria-live="polite">{speechStatus}</p>
       </div>
@@ -151,6 +170,39 @@ export default function VictimCallUi({ onTranscriptChunk }: VictimCallUiProps) {
         {transcript.length === 0 && !interimTranscript ? <p className="mt-3 font-mono text-sm text-zinc-600">Listening transcript will appear here.</p> : <div className="mt-3 space-y-3 font-mono text-sm leading-6 text-zinc-300">{transcript.map((chunk, index) => <p key={`${chunk}-${index}`}>{chunk}</p>)}{interimTranscript && <p className="text-cyan-300/70">{interimTranscript}</p>}</div>}
         <div ref={transcriptEndRef} />
       </div>
+
+      {protectionState === "safe" && (
+        <div className="absolute inset-0 z-10 flex animate-pulse flex-col items-center justify-center bg-red-950/95 px-8 text-center text-red-50">
+          <div className="relative mb-6 flex h-20 w-20 items-center justify-center" aria-hidden="true">
+            <span className="absolute h-16 w-16 animate-ping rounded-full border-2 border-red-300/70" />
+            <span className="absolute h-11 w-11 animate-ping rounded-full border-2 border-red-200/80 [animation-delay:200ms]" />
+            <span className="h-4 w-4 rounded-full bg-red-100 shadow-[0_0_20px_8px_rgba(254,202,202,0.7)]" />
+          </div>
+          <p className="font-mono text-sm font-bold uppercase tracking-[0.14em] text-red-100">
+            Scam terminated
+          </p>
+          <p className="mt-3 max-w-sm text-lg font-semibold leading-7">
+            Call disconnected to protect user
+          </p>
+          <div className="mt-6 flex items-end gap-1" aria-label="Disconnect tone animation">
+            {[20, 32, 12, 26, 8, 18].map((height, index) => (
+              <span key={height} className="w-1.5 animate-pulse rounded-full bg-red-200" style={{ height, animationDelay: `${index * 100}ms` }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {protectionState === "trap" && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-amber-300/95 px-8 text-center text-amber-950">
+          <span className="rounded-full border border-amber-950/30 bg-amber-100/60 px-3 py-1 font-mono text-xs font-bold uppercase tracking-[0.16em]">
+            Urgent verification
+          </span>
+          <p className="mt-5 text-xl font-bold leading-8">Ask the caller:</p>
+          <p className="mt-3 max-w-md rounded-lg border border-amber-950/20 bg-amber-100/50 px-5 py-4 font-mono text-base font-semibold leading-7">
+            “{trapQuestion || "Please verify your identity."}”
+          </p>
+        </div>
+      )}
     </div>
   );
 }
