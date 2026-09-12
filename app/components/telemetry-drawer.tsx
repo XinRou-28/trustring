@@ -2,28 +2,9 @@
 
 import { useState } from "react";
 
-const telemetry = [
-  {
-    timestamp: "2026-09-12T10:38:14.021Z",
-    event: "screen.connected",
-    source: "victim",
-    sessionId: "sess_7a4f",
-  },
-  {
-    timestamp: "2026-09-12T10:38:15.408Z",
-    event: "guardian.ready",
-    source: "guardian",
-    protections: ["network-watch", "input-audit"],
-  },
-  {
-    timestamp: "2026-09-12T10:38:18.991Z",
-    event: "telemetry.heartbeat",
-    latencyMs: 24,
-    status: "nominal",
-  },
-];
+export type TelemetryEntry = Record<string, unknown>;
 
-export default function TelemetryDrawer() {
+export default function TelemetryDrawer({ entries }: { entries: TelemetryEntry[] }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -46,7 +27,7 @@ export default function TelemetryDrawer() {
       {isOpen && (
         <div id="telemetry-log" className="h-52 overflow-y-auto border-t border-zinc-800 bg-black px-5 py-4">
           <pre className="whitespace-pre-wrap font-mono text-xs leading-6 text-emerald-300">
-            {JSON.stringify(telemetry, null, 2)}
+          {JSON.stringify(entries, null, 2)}
           </pre>
         </div>
       )}
