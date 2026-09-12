@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
 
@@ -35,6 +35,13 @@ type VictimCallUiProps = {
   trapQuestion?: string;
 };
 
+const scamDemoTranscript = [
+  "Hello, this is the fraud department from your bank.",
+  "We detected a suspicious transfer and need to secure your account immediately.",
+  "Please share the verification code we just sent to your phone.",
+  "Do not tell anyone about this call while we complete the security check.",
+];
+
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
   const remainder = (seconds % 60).toString().padStart(2, "0");
@@ -52,6 +59,7 @@ export default function VictimCallUi({
   const [transcript, setTranscript] = useState<string[]>([]);
   const [speechStatus, setSpeechStatus] = useState("Microphone idle");
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const simulationTimerRef = useRef<number | null>(null);
   const shouldListenRef = useRef(false);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
@@ -86,11 +94,24 @@ export default function VictimCallUi({
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (simulationTimerRef.current !== null) {
+        window.clearInterval(simulationTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (protectionState !== "safe") return;
 
     shouldListenRef.current = false;
     recognitionRef.current?.stop();
   }, [protectionState]);
+
+  const appendTranscriptChunk = useCallback((text: string) => {
+    setTranscript((chunks) => [...chunks, text]);
+    onTranscriptChunk(text);
+  }, [onTranscriptChunk]);
 
   const startListening = () => {
     const SpeechRecognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
@@ -111,8 +132,7 @@ export default function VictimCallUi({
           const text = result[0].transcript.trim();
           if (!text) continue;
           if (result.isFinal) {
-            setTranscript((chunks) => [...chunks, text]);
-            onTranscriptChunk(text);
+            appendTranscriptChunk(text);
           } else {
             interim += `${text} `;
           }
@@ -151,8 +171,46 @@ export default function VictimCallUi({
     recognitionRef.current?.stop();
   };
 
+  const simulateScamCall = () => {
+    if (simulationTimerRef.current !== null) {
+      window.clearInterval(simulationTimerRef.current);
+    }
+
+    shouldListenRef.current = false;
+    recognitionRef.current?.stop();
+    setInterimTranscript("");
+    setSpeechStatus("Playing demo scam call");
+
+    let chunkIndex = 0;
+    const playNextChunk = () => {
+      const text = scamDemoTranscript[chunkIndex];
+      if (!text) return;
+
+      appendTranscriptChunk(text);
+      chunkIndex += 1;
+
+      if (chunkIndex === scamDemoTranscript.length && simulationTimerRef.current !== null) {
+        window.clearInterval(simulationTimerRef.current);
+        simulationTimerRef.current = null;
+        setSpeechStatus("Demo scam call complete");
+      }
+    };
+
+    playNextChunk();
+    simulationTimerRef.current = window.setInterval(playNextChunk, 2000);
+  };
+
   return (
-    <div className="relative mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/30">
+    <>
+      <button
+        type="button"
+        onClick={simulateScamCall}
+        disabled={protectionState === "safe"}
+        className="mt-6 self-start rounded-md border border-amber-300/40 bg-amber-300/10 px-3 py-2 font-mono text-xs font-medium uppercase tracking-wider text-amber-200 transition-colors hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-amber-200"
+      >
+        Simulate scam call
+      </button>
+      <div className="relative mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/30">
       <div className="flex flex-col items-center border-b border-zinc-800 px-6 py-8 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-400/10 text-xl font-semibold text-cyan-200 ring-1 ring-cyan-400/30">M</div>
         <p className="mt-4 text-xl font-semibold text-zinc-50">Mom</p>
@@ -203,6 +261,7 @@ export default function VictimCallUi({
           </p>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
