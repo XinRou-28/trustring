@@ -50,11 +50,27 @@ export default function VictimCallUi({ onTranscriptChunk }: VictimCallUiProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(() => transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" }), [interimTranscript, transcript]);
+  useEffect(() => {
+    const scrollToLatestTranscript = async () => {
+      transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
 
-  useEffect(() => () => {
-    shouldListenRef.current = false;
-    recognitionRef.current?.stop();
+    void scrollToLatestTranscript();
+  }, [interimTranscript, transcript]);
+
+  useEffect(() => {
+    return () => {
+      shouldListenRef.current = false;
+
+      const recognition = recognitionRef.current;
+      if (!recognition) return;
+
+      recognition.onend = null;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.stop();
+      recognitionRef.current = null;
+    };
   }, []);
 
   const startListening = () => {
